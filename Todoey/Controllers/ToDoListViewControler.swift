@@ -7,41 +7,29 @@
 //
 
 import UIKit
+import CoreData
 
 class ToDoListViewControler: UITableViewController {
-
+    
     var itemArray = [Item]()
     
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
-   
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    
     
     override func viewDidLoad() {
         
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
-        print(dataFilePath)
-        
-        let newItem = Item()
-        newItem.title = "Find mike"
-      itemArray.append(newItem)
-
-        let newItem2 = Item()
-        newItem2.title = "batmn"
-        itemArray.append(newItem2)
-
-        let newItem3 = Item()
-        newItem3.title = "awesome"
-        itemArray.append(newItem3)
-
         loadItems()
         
         super.viewDidLoad()
     }
-
+    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return itemArray.count
     }
-   
+    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
@@ -51,25 +39,28 @@ class ToDoListViewControler: UITableViewController {
         
         cell.accessoryType = item.done ? .checkmark : .none
         
-//        if item.done == true{
-//            cell.accessoryType = .checkmark
-//        }else{
-//            cell.accessoryType = .none
-//        }
+        //        if item.done == true{
+        //            cell.accessoryType = .checkmark
+        //        }else{
+        //            cell.accessoryType = .none
+        //        }
         return cell
     }
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-       print("cell for row at inexpath")
+        print("cell for row at inexpath")
         
+        //
+        //        context.delete(itemArray[indexPath.row])
+        //        itemArray.remove(at: indexPath.row)
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-//        if itemArray[indexPath.row].done == false{
-//            itemArray[indexPath.row].done = true
-//        }else{
-//            itemArray[indexPath.row].done = false
-//        }
+        //        if itemArray[indexPath.row].done == false{
+        //            itemArray[indexPath.row].done = true
+        //        }else{
+        //            itemArray[indexPath.row].done = false
+        //        }
         tableView.reloadData()
         saveItems()
         tableView.deselectRow(at: indexPath, animated: true)
@@ -81,10 +72,13 @@ class ToDoListViewControler: UITableViewController {
         var textField = UITextField()
         
         let alert = UIAlertController(title: "Add new Todoey itme", message: "", preferredStyle: .alert)
-      
+        
         let action = UIAlertAction(title: "add Item", style: .default) { (action) in
-           let newitem = Item()
+            
+            
+            let newitem = Item(context: self.context)
             newitem.title = textField.text!
+            newitem.done = false
             
             self.itemArray.append(newitem)
             self.saveItems()
@@ -103,27 +97,46 @@ class ToDoListViewControler: UITableViewController {
         present(alert,animated: true,completion: nil)
     }
     
+    //MARK - Model Minupilation Method
+    
     func saveItems() {
-        let encoder = PropertyListEncoder()
         
         do{
-            let data = try encoder.encode(itemArray)
-            try data.write(to: dataFilePath!)
+            try  context.save()
             
         }catch{
             print("Error in \(error.localizedDescription)")
         }
         
     }
-    func loadItems(){
-        let data = try? Data(contentsOf: dataFilePath!)
-        let decoder = PropertyListDecoder()
-        do {
-            itemArray = try decoder.decode([Item].self, from: data!)
+    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest()){
+        do{
+            itemArray =  try context.fetch(request)
         }catch{
-            print(error.localizedDescription)
+            print("error\(error.localizedDescription)")
         }
+        tableView.reloadData()
     }
-    
 }
 
+extension ToDoListViewControler : UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItems(with: request)
+        
+    }
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0{
+            loadItems()
+            
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+        }
+    }
+}
